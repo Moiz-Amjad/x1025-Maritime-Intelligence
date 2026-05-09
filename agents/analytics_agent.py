@@ -1,29 +1,6 @@
-"""
-agents/analytics_agent.py
-=========================
-Layer 2 — Fleet Performance / Operational Specialist.
-
-Wraps Dave's voyage simulator API at backend/stream/. Exposes a small set
-of deterministic tools the supervisor can dispatch to operational queries:
-
-    list_voyages         — what's in the fleet right now
-    get_voyage_status    — full status for one voyage
-    get_active_incidents — incidents currently open across the fleet
-    get_fleet_risk       — fleet-wide risk summary
-    get_recommendations  — current AI recommendations
-
-The agent does NOT do free-form text-to-SQL. Each tool is a fixed Python
-function; the LLM picks one and emits arguments as JSON, validated against
-the tool's schema before execution. Same pattern as Layer 2 in the
-x1025_IMPACT prototype, just adapted to Dave's REST API.
-
-Usage:
-    from agents.analytics_agent import AnalyticsAgent
-    agent = AnalyticsAgent(stream_url="http://localhost:8000")
-    print(agent.list_voyages())
-    print(agent.get_voyage_status("voyage_001"))
-    print(agent.query("What's the ETA for voyage_001?"))
-"""
+"""Layer 2 agent. Wraps the voyage stream API at backend/stream/ and
+exposes a few read-only tools the supervisor calls for operational
+queries about fleet status, incidents, and risk."""
 from __future__ import annotations
 
 import re

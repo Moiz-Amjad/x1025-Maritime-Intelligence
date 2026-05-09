@@ -1,3 +1,6 @@
+"""Layer 3 agent. Watches the incident stream and writes an action plan
+for each new incident, pulling live voyage state from analytics_agent
+and (when wired) ISM procedures from safety_agent."""
 from __future__ import annotations
 
 import time

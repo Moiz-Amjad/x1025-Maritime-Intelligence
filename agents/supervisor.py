@@ -1,19 +1,5 @@
-"""
-agents/supervisor.py
-====================
-The CEO Agent / Router.
-
-Receives an incoming question, classifies it as procedural, operational,
-both, or none, and dispatches to the appropriate specialist agent:
-
-  procedural  → SafetyAgent     (Layer 1 — Moiz's RAG over ISM/safety docs)
-  operational → AnalyticsAgent  (Layer 2 — Dave's voyage stream)
-  both        → run both, synthesize the response
-  none        → polite refusal
-
-The classifier uses simple keyword heuristics. An LLM-based classifier
-can replace `_classify_with_llm` later — same interface.
-"""
+"""Routes a question to the right specialist agent. Picks between the
+safety RAG and the analytics layer, or runs both when needed."""
 from __future__ import annotations
 
 import re
