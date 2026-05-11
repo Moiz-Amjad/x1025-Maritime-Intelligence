@@ -6,6 +6,8 @@ This repository is the production home for the x1025 maritime AI stack. It build
 
 The Layer 1 RAG pipeline is **production-grade**: it ingests, searches, and reasons over highly technical maritime engineering manuals (e.g. the *N.S. SAVANNAH Safety Analysis Report*) and returns 100% grounded answers without hallucinating — a critical requirement under the ISM Code.
 
+A FastAPI server (`backend/api/server.py`) exposes the warm-loaded `SafetyAgent` over HTTP, and a React/Vite web frontend (`frontend/web/`) wraps it in a light-themed chat interface with a `Guardrails` sidebar of vetted prompts and a built-in three-stage **upload pipeline** that lets crews drop in a new PDF, watch the docling → vision → LanceDB ingestion progress live, and have the agent switch onto the freshly-indexed manual the moment it's ready.
+
 ## Repository layout
 
 Only files that currently exist in the repo are listed below. Empty directories (kept via `.gitkeep`) are placeholders for upcoming work.
@@ -16,6 +18,8 @@ x1025-Maritime-Intelligence/
 │   └── safety_agent.py           # Layer 1 — Procedural/ISM specialist (RAG)
 │
 ├── backend/
+│   ├── api/
+│   │   └── server.py             # FastAPI: /chat (SSE), /manuals, /switch, /upload (3-stage SSE)
 │   ├── ingestion/
 │   │   ├── docling_parser.py     # PDF → Markdown via Docling
 │   │   └── vision_captioner.py   # InternVL2.5-38B-AWQ image-to-text
@@ -26,6 +30,7 @@ x1025-Maritime-Intelligence/
 ├── frontend/
 │   ├── chat_interface/
 │   │   └── cli.py                # Interim Python REPL — warm-loads SafetyAgent, supports `switch`
+│   ├── web/                      # React/Vite chat UI (light theme, Guardrails sidebar, upload pipeline)
 │   ├── dashboard/                # (empty — TS/React fleet-overview UI to come)
 │   └── agent_monitor/            # (empty — agent-thinking visualizer to come)
 │
@@ -57,6 +62,8 @@ The four files marked ✅ above form a complete, runnable RAG pipeline:
 * **`backend/storage/lancedb_client.py`** — owns the shared **NV-Embed-v2** embedder, the macro-chunker (1000-word cap, 5-line overlap, header-aware sectioning, image-chunk type), the `_SCHEMA` (text + 4096-d vector + section + chunk_type + image fields), the FTS index, and `hybrid_search()` (cosine + BM25 fused via `RRFReranker`). Patches the upstream `modeling_nvembed.py` on first load to fix two transformers incompatibilities (rotary embeddings not threaded through gradient checkpointing; KV-cache tensor handling). Used by both the ingestion write path and the agent read path.
 * **`agents/safety_agent.py`** — the `SafetyAgent` lifecycle wrapper. Loads the embedder + **Qwen3-Reranker-0.6B** in the parent process, spawns the **Qwen3.6-35B-A3B Q6_K** (`llama.cpp`) generator in a `multiprocessing.spawn` child pinned to one MIG slice via `CUDA_VISIBLE_DEVICES`, exposes `retrieve()` / `generate()` / `query()` / `switch_table()` / `close()`. Also provides a `--retrieve-only` CLI for inspecting reranked chunks without spinning up the LLM.
 * **`frontend/chat_interface/cli.py`** — interim REPL. Lists `data/lancedb/*.lance`, prompts the user to pick one, warm-loads `SafetyAgent` once, and supports a `switch` command that swaps the table without reloading any model.
+* **`backend/api/server.py`** — FastAPI server that warm-loads `SafetyAgent` once at startup (~3 min) and exposes four endpoints: `GET /manuals`, `POST /switch`, `POST /chat` (SSE token stream), and `POST /upload` (multipart PDF + SSE three-step progress). The `/upload` endpoint orchestrates the full ingestion pipeline — docling → vision → LanceDB — runs each step inside `loop.run_in_executor`, serializes the embedding step against the chat lock to prevent NV-Embed-v2 contention, and switches the live agent onto the newly-indexed manual on completion. Reuses the agent's NV-Embed-v2 embedder during ingest so the embedder is never double-loaded.
+* **`frontend/web/`** — React/Vite light-themed chat UI (Inter font, navy + slate palette, soft-shadow white cards). Streams tokens from `/chat`, swaps manuals via `/switch`, drives the three-stage ingestion via `/upload` with a live `X / 3` progress card rendered both in the Guardrails sidebar and in the chat log. The Guardrails sidebar holds the upload affordance plus a list of vetted maritime-safety prompts that prefill the chat input. Markdown bleed-through from the LLM (occasional `**` and `#` despite the no-Markdown system rule) is stripped at render time.
 
 ## Layer 1 — Key architectural innovations (RAG pipeline)
 
@@ -141,6 +148,22 @@ python -m agents.safety_agent data/lancedb/<folder>_lancedb.lance "your question
 python -m agents.safety_agent --retrieve-only data/lancedb/<folder>_lancedb.lance "your query"
 ```
 
+### Phase 3: Web frontend (FastAPI + React)
+
+The web stack lets crews chat against the agent and drop in new PDFs from a browser — the API server runs the three-stage ingestion inline and switches the agent onto the new manual the moment indexing completes.
+
+1. **Start the FastAPI server** (from project root). Warm-loads `SafetyAgent` once, then serves `/manuals`, `/switch`, `/chat`, `/upload`:
+   ```bash
+   uvicorn backend.api.server:app --host 0.0.0.0 --port 8001
+   ```
+2. **Start the Vite dev server** (from `frontend/web/`). Proxies `/api/*` → `http://localhost:8001`:
+   ```bash
+   cd frontend/web
+   npm install        # first time only
+   npm run dev
+   ```
+3. **Open** `http://localhost:5173`. The Guardrails sidebar holds the "Add a manual" PDF upload button and a list of vetted safety prompts; the chat card streams tokens from the active manual.
+
 ## Performance demonstration
 
 The pipeline has been extensively tested against the *N.S. SAVANNAH Safety Analysis Report*. By combining Macro-Chunking with a cross-encoder reranker and a strictly-grounded generator, the system extracts and synthesizes correct answers from highly complex, tabular engineering data where standard RAG systems fail.
@@ -165,10 +188,12 @@ Building this pipeline involved solving several real limitations of modern LLMs 
 | 1 | `backend/ingestion/vision_captioner.py` | ✅ Working |
 | 1 | `backend/storage/lancedb_client.py` | ✅ Working |
 | 1 | `frontend/chat_interface/cli.py` (interim Python REPL) | ✅ Working |
+| 1 | `backend/api/server.py` (FastAPI: `/chat`, `/manuals`, `/switch`, `/upload`) | ✅ Working |
+| 1 | `frontend/web/` (React/Vite chat UI + upload pipeline + Guardrails sidebar) | ✅ Working |
 | 2 | `agents/analytics_agent.py`, `backend/stream/`, `backend/storage/timeseries_db.py` | ⏸ Not yet scaffolded |
 | 3 | `agents/superintendent.py` | ⏸ Stretch goal |
 | — | `agents/supervisor.py` | ⏸ Not yet scaffolded |
-| — | `frontend/{dashboard,chat_interface (TS/React),agent_monitor}/` | 🚧 Empty — TS/React UI pending |
+| — | `frontend/{dashboard,agent_monitor}/` | 🚧 Empty — TS/React UI pending |
 | — | `hardware/raspberry_pi/` | 🚧 Empty — Pi sensor scripts pending |
 | — | `infra/model_configs/` | 🚧 Placeholder + README; configs to be extracted from hard-coded constants |
 | — | `infra/docker-compose.yml` | ⏸ Optional, not yet authored |

@@ -159,11 +159,11 @@ def _store_chunks(chunks: list, db_path: Path, table_name: str):
     table.create_fts_index("text", replace=True, use_tantivy=False)
     print(f"Indexed {len(chunks)} chunks to {db_path.name}/{table_name}.")
 
-def ingest(folder: Path):
+def ingest(folder: Path, embedder=None):
     folder = folder.resolve()
     md, manifest = _read_source(folder)
     chunks = _parse_image_chunks(md, manifest, folder) + _parse_text_chunks(md)
-    chunks = _embed_chunks(load_embed_model(), chunks)
+    chunks = _embed_chunks(embedder if embedder is not None else load_embed_model(), chunks)
     _store_chunks(chunks, folder.parent / "lancedb", f"{folder.name}_lancedb")
 
 # ---------------------------------------------------------------------------

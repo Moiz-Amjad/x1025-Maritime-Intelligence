@@ -1,0 +1,6 @@
+node_modules
+dist
+*.tsbuildinfo
+# Compiled outputs of vite.config.ts (keep the .ts source only)
+vite.config.js
+vite.config.d.ts
