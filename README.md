@@ -10,8 +10,6 @@ A FastAPI server (`backend/api/server.py`) exposes the warm-loaded `SafetyAgent`
 
 ## Repository layout
 
-Only files that currently exist in the repo are listed below. Empty directories (kept via `.gitkeep`) are placeholders for upcoming work.
-
 ```
 x1025-Maritime-Intelligence/
 ├── agents/
@@ -30,20 +28,9 @@ x1025-Maritime-Intelligence/
 ├── frontend/
 │   ├── chat_interface/
 │   │   └── cli.py                # Interim Python REPL — warm-loads SafetyAgent, supports `switch`
-│   ├── web/                      # React/Vite chat UI (light theme, Guardrails sidebar, upload pipeline)
-│   ├── dashboard/                # (empty — TS/React fleet-overview UI to come)
-│   └── agent_monitor/            # (empty — agent-thinking visualizer to come)
+│   └── web/                      # React/Vite chat UI (light theme, Guardrails sidebar, upload pipeline)
 │
-├── hardware/
-│   └── raspberry_pi/             # (empty — Pi sensor + telemetry scripts to come)
-│
-├── infra/
-│   └── model_configs/
-│       └── README.md             # Notes for upcoming per-model YAML configs
-│
-├── tests/                        # (empty — pytest scaffolding to come)
 ├── data/                         # Raw PDFs + ingestion outputs (gitignored)
-├── assets/                       # (empty — README screenshots to come)
 │
 ├── .env.example                  # HF_HOME / HF_TOKEN / OPENAI_* template
 ├── .gitignore
@@ -168,8 +155,6 @@ The web stack lets crews chat against the agent and drop in new PDFs from a brow
 
 The pipeline has been extensively tested against the *N.S. SAVANNAH Safety Analysis Report*. By combining Macro-Chunking with a cross-encoder reranker and a strictly-grounded generator, the system extracts and synthesizes correct answers from highly complex, tabular engineering data where standard RAG systems fail.
 
-Screenshots from the prototype runs (`assets/performance_1.png`, `assets/performance_2.png`) will be re-added here once the prototype assets are migrated into this repo.
-
 ## Engineering "war stories"
 
 Building this pipeline involved solving several real limitations of modern LLMs and toolchains:
@@ -193,11 +178,6 @@ Building this pipeline involved solving several real limitations of modern LLMs 
 | 2 | `agents/analytics_agent.py`, `backend/stream/`, `backend/storage/timeseries_db.py` | ⏸ Not yet scaffolded |
 | 3 | `agents/superintendent.py` | ⏸ Stretch goal |
 | — | `agents/supervisor.py` | ⏸ Not yet scaffolded |
-| — | `frontend/{dashboard,agent_monitor}/` | 🚧 Empty — TS/React UI pending |
-| — | `hardware/raspberry_pi/` | 🚧 Empty — Pi sensor scripts pending |
-| — | `infra/model_configs/` | 🚧 Placeholder + README; configs to be extracted from hard-coded constants |
-| — | `infra/docker-compose.yml` | ⏸ Optional, not yet authored |
-| — | `tests/` | 🚧 Empty — pytest scaffolding pending |
 
 ---
 *Developed for the IMPACT Program — UMass Boston Venture Development Center*
