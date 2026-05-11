@@ -17,6 +17,9 @@ venv.bak/
 # macOS
 .DS_Store
 
+# Tool / IDE
+.claude/
+
 # Data & Databases
 lancedb/
 *.pdf
